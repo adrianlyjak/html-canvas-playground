@@ -1,0 +1,177 @@
+<html>
+<head>
+  <style>
+    .color-block {
+      width: 20px; height: 20px; display: inline-block;
+    }
+  </style>
+</head>
+<body>
+    <div id="controls">
+    </div>
+    <canvas id="canvas" style="background-color: lightblue; "></canvas>
+    <script type="text/javascript">
+        (function() {
+
+
+            const Cycler = (options, mapper) => {
+                let selectedIndex = 0;
+                let listeners = [];
+                const self = {
+
+                    selectIndex(value) {
+                      const was = self.selected();
+                      selectedIndex = value % options.length;
+                      const selectedNow = self.selected();
+                      listeners.forEach(fn => fn({
+                        value: selectedNow,
+                        was
+                      }));
+                      return self
+                    },
+
+                    selectOption(value) {
+                        return self.selectIndex(options.indexOf(mapper && mapper(value) || value));
+                    },
+
+                    selected() {
+                      return options[selectedIndex];
+                    },
+
+                    cycleSelected() {
+                      return self.selectIndex(selectedIndex + 1);
+                    },
+
+                    random() {
+                      return options[Math.floor(Math.random() * options.length)]
+                    },
+
+                    addChangeListener(fn) {
+                      listeners.push(fn);
+                      return self;
+                    },
+
+                    addSelectControlToElement(element, label) {
+                      const container = document.createElement('div')
+
+                      const lbl = document.createElement('span')
+                      lbl.innerText = label
+                      container.appendChild(lbl)
+
+                      const select = document.createElement('select')
+                      options.forEach((x, i) => {
+                        const el = document.createElement('option')
+                        el.innerText = x;
+                        el.value = x;
+                        if (i == selectedIndex) {
+                          el.selected = true;
+                        }
+                        select.appendChild(el);
+                      });
+                      select.addEventListener('change', e => {
+                        self.selectOption(e.target.value)
+                      })
+                      container.appendChild(select);
+                      element.appendChild(container)
+                    }
+                }
+                return self;
+            }
+
+
+
+            const $ = id => document.querySelector(id)
+
+            const colors = Cycler(['#000000', '#888888', '#FFFFFF'])
+
+            const composites = Cycler([
+              'source-over',
+              'multiply',
+              'screen',
+              'overlay',
+              'darken',
+              'lighten',
+              'color-dodge',
+              'color-burn',
+              'hard-light',
+              'soft-light',
+              'difference',
+              'exclusion',
+              'hue',
+              'saturation',
+              'color',
+              'luminosity',
+            ])
+
+            const alphas = Cycler([
+              1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1
+            ], v => Number(v))
+
+            const sizes = Cycler([
+              80, 5, 10, 20, 40, 160
+            ],
+              str => Number(str)
+            )
+
+            function drawCircle({ x, y, canvas, color, diameter, blur, opacity}) {
+              const ctx = canvas.getContext('2d');
+              ctx.beginPath();
+              ctx.fillStyle = color;
+              ctx.shadowColor = color;
+              ctx.shadowBlur = blur;
+              ctx.globalAlpha = opacity;
+
+              ctx.arc(x, y, diameter, 0, Math.PI * 2, true);
+              ctx.closePath();
+              ctx.fill();
+            }
+
+
+            function initCanvasSize(c) {
+                const {
+                    width,
+                    height
+                } = c.parentElement.getBoundingClientRect()
+                c.width = width
+                c.height = height
+                return c
+            }
+
+            function initControls({colors, composites}) {
+                const el = $("#controls")
+                colors.addSelectControlToElement(el, 'Color')
+                composites.addSelectControlToElement(el, 'Composite')
+                sizes.addSelectControlToElement(el, 'Sizes')
+                alphas.addSelectControlToElement(el, 'Opacity')
+            }
+
+
+            var canvas = $("#canvas")
+            initCanvasSize(canvas);
+            initControls({colors, composites})
+
+            var ctx = canvas.getContext('2d');
+
+            composites.addChangeListener(({value}) => {
+                ctx.globalCompositeOperation = value
+            })
+
+
+
+            canvas.addEventListener('click', (e) => {
+                console.log(e)
+                drawCircle({
+                  x: e.offsetX, y: e.offsetY,
+                  canvas,
+                  color: colors.selected(),
+                  diameter: sizes.selected(),
+                  blur: 20,
+                  opacity: alphas.selected()
+                })
+
+            })
+        })()
+    </script>
+</body>
+
+</html>
