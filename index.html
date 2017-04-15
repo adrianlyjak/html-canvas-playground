@@ -14,7 +14,7 @@
         (function() {
 
 
-            const Cycler = (options, mapper) => {
+            const Cycler = (options, toValue, toString) => {
                 let selectedIndex = 0;
                 let listeners = [];
                 const self = {
@@ -31,7 +31,7 @@
                     },
 
                     selectOption(value) {
-                        return self.selectIndex(options.indexOf(mapper && mapper(value) || value));
+                        return self.selectIndex(options.indexOf(toValue ? toValue(value) : value));
                     },
 
                     selected() {
@@ -61,8 +61,9 @@
                       const select = document.createElement('select')
                       options.forEach((x, i) => {
                         const el = document.createElement('option')
-                        el.innerText = x;
-                        el.value = x;
+                        const text = toString ? toString(x) : x;
+                        el.innerText = text;
+                        el.value = text;
                         if (i == selectedIndex) {
                           el.selected = true;
                         }
@@ -78,11 +79,19 @@
                 return self;
             }
 
+            Cycler.numbers = (options) => Cycler(options, v => Number(v))
+            Cycler.json = (options) => Cycler(options, v => JSON.parse(v), o => JSON.stringify(o))
+
 
 
             const $ = id => document.querySelector(id)
 
-            const colors = Cycler(['#000000', '#888888', '#FFFFFF'])
+            const colorValues = [128,
+              1, 
+              32, 64, 96, 128, 
+              160, 192, 224, 256].map(v => v - 1)
+            const grayValue = Cycler.numbers(colorValues)
+
 
             const composites = Cycler([
               'source-over',
@@ -103,25 +112,31 @@
               'luminosity',
             ])
 
-            const alphas = Cycler([
-              1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1
-            ], v => Number(v))
+            const alphas = Cycler.json([
+              0.5,
+              1,   0.9, 0.8, 0.7, 0.6, 
+              0.5, 0.4, 0.3, 0.2, 0.1
+            ])
 
-            const sizes = Cycler([
+            const sizes = Cycler.numbers([
               80, 5, 10, 20, 40, 160
-            ],
-              str => Number(str)
-            )
+            ])
 
-            function drawCircle({ x, y, canvas, color, diameter, blur, opacity}) {
+            const blurs = Cycler.numbers([
+              0, 0.2, 0.4, 0.5, 0.6, 0.8, 1
+            ])
+
+            function drawCircle({ x, y, canvas, r, g, b, diameter, blur, opacity}) {
               const ctx = canvas.getContext('2d');
               ctx.beginPath();
-              ctx.fillStyle = color;
-              ctx.shadowColor = color;
-              ctx.shadowBlur = blur;
-              ctx.globalAlpha = opacity;
+              const rad = diameter / 2
+              const grad = ctx.createRadialGradient(x, y, rad, x, y, rad * blur)
+              const color = a => `rgba(${r}, ${g}, ${b}, ${a})`;
+              grad.addColorStop(0, color(0));
+              grad.addColorStop(1, color(opacity));
+              ctx.fillStyle = grad;
 
-              ctx.arc(x, y, diameter, 0, Math.PI * 2, true);
+              ctx.fillRect(x - rad, y - rad, diameter, diameter);
               ctx.closePath();
               ctx.fill();
             }
@@ -137,18 +152,19 @@
                 return c
             }
 
-            function initControls({colors, composites}) {
+            function initControls() {
                 const el = $("#controls")
-                colors.addSelectControlToElement(el, 'Color')
+                grayValue.addSelectControlToElement(el, 'Gray')
                 composites.addSelectControlToElement(el, 'Composite')
                 sizes.addSelectControlToElement(el, 'Sizes')
                 alphas.addSelectControlToElement(el, 'Opacity')
+                blurs.addSelectControlToElement(el, 'Blur')
             }
 
 
             var canvas = $("#canvas")
             initCanvasSize(canvas);
-            initControls({colors, composites})
+            initControls()
 
             var ctx = canvas.getContext('2d');
 
@@ -156,20 +172,22 @@
                 ctx.globalCompositeOperation = value
             })
 
-
-
-            canvas.addEventListener('click', (e) => {
-                console.log(e)
+            let drawing = false;
+            const drawCurrent = (e) => {
                 drawCircle({
-                  x: e.offsetX, y: e.offsetY,
-                  canvas,
-                  color: colors.selected(),
-                  diameter: sizes.selected(),
-                  blur: 20,
-                  opacity: alphas.selected()
-                })
-
-            })
+                    x: e.offsetX, y: e.offsetY,
+                    canvas,
+                    r: grayValue.selected(), g: grayValue.selected(), b: grayValue.selected(), 
+                    diameter: sizes.selected(),
+                    blur: blurs.selected(),
+                    opacity: alphas.selected()
+                  })
+            }
+            canvas.addEventListener('mousedown', (e) => drawing = true);
+            canvas.addEventListener('mouseup', e => drawing = false);
+            canvas.addEventListener('mousemove', e => drawing && drawCurrent(e));
+            canvas.addEventListener('click', e => drawCurrent(e));
+            
         })()
     </script>
 </body>
